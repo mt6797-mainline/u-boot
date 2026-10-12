@@ -1,0 +1,53 @@
+// SPDX-License-Identifier: GPL-2.0+
+/dts-v1/;
+/ {
+	model = "LeEco X620 U-Boot relay";
+	compatible = "leeco,x620", "mediatek,mt6797";
+	#address-cells = <2>;
+	#size-cells = <2>;
+	aliases { serial0 = &uart0; };
+	chosen { stdout-path = "serial0:921600n8"; };
+	memory@48000000 {
+		device_type = "memory";
+		reg = <0 0x48000000 0 0x08000000>;
+	};
+	uart0: serial@11002000 {
+		compatible = "mediatek,mt6577-uart";
+		reg = <0 0x11002000 0 0x1000>;
+		clock-frequency = <26000000>;
+		bootph-all;
+	};
+	video {
+		compatible = "leeco,x620-lk-video";
+	};
+	lk_vusb: regulator-vusb {
+		compatible = "regulator-fixed";
+		regulator-name = "lk-retained-vusb33";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-always-on;
+	};
+	usb_phy: phy@11290000 {
+		compatible = "leeco,x620-usb2-phy";
+		reg = <0 0x11290000 0 0x10000>;
+		#phy-cells = <0>;
+	};
+	usb@11280700 {
+		compatible = "mediatek,mtu3";
+		reg = <0 0x11280700 0 0x100>;
+		reg-names = "ippc";
+		vusb33-supply = <&lk_vusb>;
+		phys = <&usb_phy>;
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+		gadget@11270000 {
+			compatible = "mediatek,ssusb";
+			reg = <0 0x11270000 0 0x10000>;
+			reg-names = "mac";
+			dr_mode = "peripheral";
+			maximum-speed = "high-speed";
+			mediatek,force-vbus;
+		};
+	};
+};

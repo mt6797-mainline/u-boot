@@ -1,11 +1,14 @@
 # SPDX-License-Identifier:	GPL-2.0
 
+ifneq ($(CONFIG_TARGET_MT6797_X620),y)
 obj-$(CONFIG_ARM64) += armv8-mem-map.o
+endif
 obj-y	+= cpu.o
 obj-$(CONFIG_MTK_TZ_MOVABLE)	+= tzcfg.o
 obj-$(CONFIG_XPL_BUILD)	+= spl.o
 
 obj-$(CONFIG_TARGET_MT7622) += mt7622/
+obj-$(CONFIG_TARGET_MT6797_X620) += mt6797/
 obj-$(CONFIG_TARGET_MT7623) += mt7623/
 obj-$(CONFIG_TARGET_MT7629) += mt7629/
 obj-$(CONFIG_TARGET_MT7981) += mt7981/

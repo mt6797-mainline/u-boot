@@ -1,0 +1,100 @@
+.. SPDX-License-Identifier: GPL-2.0+
+
+LeEco X620: stock-LK U-Boot relay
+================================
+
+This experimental MT6797 port runs U-Boot proper as the kernel payload of
+an Android v0 boot image. Stock preloader, ATF and LK remain responsible for
+DRAM, PMIC, PLL and panel initialization. No SPL or replacement LK is built.
+
+The LK-facing payload is a gzip stream followed by the original hardware
+DTB. The decompressed U-Boot has an ARM64 Linux Image header with text_offset
+0x80000 and entry 0x40080000. The gzip stream contains the entire U-Boot
+binary including its own separate control DTB; the original hardware DTB
+is appended outside that stream. The workspace packager retains the
+original ramdisk blob to reproduce the usual LK loading path. It is not
+executed by U-Boot.
+
+Memory and handoff
+------------------
+
+The entry hook saves x0-x3, CurrentEL and SCTLR into initialized data. With
+the MMU disabled it writes a persistent entry marker and disables the AP
+RGU watchdog before setting up the C runtime. PMIC/SPM watchdogs are not
+controlled by this first implementation. A previous 24-second restart has
+not been proven to originate in AP RGU.
+
+Only 0x48000000..0x50000000 is offered to the U-Boot allocator. This keeps
+relocation, stack and malloc away from stock ATF, LK, DTB, ramdisk and RAM
+console. The fastboot download area is 0x48000000..0x4c000000, below the
+observed relocation/malloc region. The first 512 MiB of DDR has a normal
+memory mapping. The measured framebuffer range at 0xbd000000..0xbf000000
+has a separate noncacheable mapping and is not allocator RAM.
+
+After relocation, LMB also admits low DDR at 0x40000000..0x48000000 for
+Linux Image placement. Explicit no-overwrite reservations protect LK, ATF,
+preloader data, RAM console and the LK DT workspace; the download buffer is
+also reserved. This does not widen the C heap or relocation window. FDT
+memory fixup from the restricted U-Boot DRAM bank is disabled so Linux
+keeps the memory description from its own DT.
+
+Persistent markers occupy the first page of the vendor console zone at
+0x444bf000. They use its signature/start/size header layout. Recovery can
+still clear these bytes; absence of a marker does not prove no entry.
+
+Display and USB
+---------------
+
+The retained display driver accepts only the live packed videolfb tag for
+panel 378C81, bounded to the mapped framebuffer range. It checks OVL0,
+layer-0 address and pitch, and DSI0 command mode before removing the logo
+overlay. A bounded DSI busy wait precedes display-mutex and DSI-start
+triggers. It does not implement full panel, DDP or power-domain bring-up.
+In the first X620 device test, the displayed picture disappeared and only
+the backlight remained on. A working display console has not been established.
+
+USB uses the upstream MTU3 gadget driver with MT6797 MAC/IPPC addresses
+and a board-specific USB2 PHY recovery sequence derived from the reference
+kernel. Supply and PLL calibration are inherited from LK; Type-C policy
+and PMIC initialization are not implemented. USB3 operation is disabled.
+Fastboot flashing is disabled. Download, FIT/Android boot support and
+``fastboot oem console`` are compiled in, with a diagnostic polling loop.
+USB did not work in that first device test; enumeration and downloads are
+not established on hardware.
+
+The default boot command prints handoff diagnostics, attempts USB fastboot,
+and remains in U-Boot with a five-second heartbeat. It does not automatically
+boot Linux. A UART Ctrl-C returns to the U-Boot shell; USB fastboot
+``continue`` exits the USB loop into the heartbeat command.
+
+Build and validation
+--------------------
+
+The first device test was reported against the 3,049,472-byte Android boot
+image with SHA256
+``e1b0658d93df03d216cc52a20c875bd819bd1c55b3a2e5313a7192782af4ea5a``.
+The owner reported a response followed by loss of the picture with backlight
+remaining on, and USB unavailable. No device logs were collected for this
+attempt yet, so the reached U-Boot stage and watchdog behavior are unknown.
+
+The source checkout includes ``board/mediatek/x620/x620.config`` as the
+initial production build configuration. To build the U-Boot binary alone::
+
+    mkdir -p /tmp/x620-uboot-build
+    cp board/mediatek/x620/x620.config /tmp/x620-uboot-build/.config
+    make O=/tmp/x620-uboot-build CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
+    make O=/tmp/x620-uboot-build CROSS_COMPILE=aarch64-linux-gnu- -j10 u-boot.bin
+
+Reuse that output directory for later builds. This builds the relay binary;
+Android boot-image packaging also needs the stock device DTB and ramdisk.
+
+The workspace uses an external ``cfg/x620-uboot.config`` rather than modifying
+an existing source defconfig. ``scripts/build-uboot.sh`` reuses ``out/u-boot``
+and produces fixed ``dist/boot.img`` and ``dist/u-boot.bin`` names. The package
+is checked against the device's measured 16 MiB boot partition.
+
+``scripts/build-uboot-qemu.sh`` builds the same X620 board code with a test-only
+PL011 control DT. ``scripts/test-uboot-qemu.py`` supplies the real captured LK
+DT at 0x44000000 through a register-setting shim, checks entry and relocation
+markers and a 60-second heartbeat, then exercises ``booti`` with the archived
+Linux rescue payload. It does not emulate MT6797 display, USB or watchdog IO.

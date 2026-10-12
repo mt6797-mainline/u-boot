@@ -7,3 +7,4 @@ Mediatek
    :maxdepth: 2
 
    mt7621
+   x620

@@ -1093,6 +1093,9 @@ dtb-$(CONFIG_SOC_K3_AM62P5) += k3-am62p5-r5-sk.dtb \
 mt8371-genio-520-evk-ufs-dtbs := mt8371-genio-520-evk.dtb mt8371-genio-common-ufs.dtbo
 mt8391-genio-720-evk-ufs-dtbs := mt8391-genio-720-evk.dtb mt8371-genio-common-ufs.dtbo
 
+ifeq ($(CONFIG_TARGET_MT6797_X620),y)
+dtb-y += mt6797-x620-uboot.dtb
+else
 dtb-$(CONFIG_ARCH_MEDIATEK) += \
 	mt7622-rfb.dtb \
 	mt7623a-unielec-u7623-02-emmc.dtb \
@@ -1119,6 +1122,7 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
 	mt8512-bm1-emmc.dtb \
 	mt8516-pumpkin.dtb \
 	mt8518-ap1-emmc.dtb
+endif
 
 dtb-$(CONFIG_ARCH_NPCM7xx) += nuvoton-npcm750-evb.dtb
 dtb-$(CONFIG_ARCH_NPCM8XX) += nuvoton-npcm845-evb.dtb
