@@ -3,6 +3,7 @@
 #include <console.h>
 #include <cpu_func.h>
 #include <env.h>
+#include <event.h>
 #include <init.h>
 #include <lmb.h>
 #include <time.h>
@@ -11,8 +12,11 @@
 #include <linux/libfdt.h>
 #include <asm/unaligned.h>
 #include <asm/cache.h>
+#include <asm/arch/x620.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
+#include <asm/ptrace.h>
+#include <asm/system.h>
 #include "x620.h"
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -31,6 +35,34 @@ void x620_log(const char *message)
 	writel(n, (void *)(LOG_BASE + 4));
 	writel(n, (void *)(LOG_BASE + 8));
 	flush_dcache_range(LOG_BASE, LOG_BASE + 4096);
+}
+
+void x620_record_exception(const char *kind, struct pt_regs *regs)
+{
+	static bool recorded;
+	ulong far = 0, el = current_el();
+	char line[240];
+
+	/* Preserve the first exception even if printing its report faults again. */
+	if (recorded)
+		return;
+	recorded = true;
+	x620_log("X620_EXCEPTION_BEGIN\n");
+	if (el == 1)
+		asm volatile("mrs %0, far_el1" : "=r" (far));
+	else if (el == 2)
+		asm volatile("mrs %0, far_el2" : "=r" (far));
+	else if (el == 3)
+		asm volatile("mrs %0, far_el3" : "=r" (far));
+	snprintf(line, sizeof(line),
+		 "X620_EXCEPTION %s EL=%lu ESR=%lx FAR=%lx ELR=%lx PC=%lx LR=%lx SPSR=%lx\n",
+		 kind, el, regs->esr, far, regs->elr,
+		 regs->elr - (gd->flags & GD_FLG_RELOC ? gd->reloc_off : 0),
+		 regs->regs[30], regs->spsr);
+	x620_log(line);
+	snprintf(line, sizeof(line), "X620_FAULT_ARGS X0=%lx X1=%lx X2=%lx X3=%lx\n",
+		 regs->regs[0], regs->regs[1], regs->regs[2], regs->regs[3]);
+	x620_log(line);
 }
 
 static const void *lk_fdt(void)
@@ -119,6 +151,43 @@ int board_late_init(void)
 	return 0;
 }
 
+static int x620_last_stage(void)
+{
+	x620_log("X620_LAST_STAGE_INIT\n");
+	return 0;
+}
+EVENT_SPY_SIMPLE(EVT_LAST_STAGE_INIT, x620_last_stage);
+
+static int x620_main_loop(void)
+{
+	u64 frequency, counter;
+	char state[192];
+
+	x620_log("X620_MAIN_LOOP\n");
+	asm volatile("mrs %0, cntfrq_el0" : "=r" (frequency));
+	asm volatile("mrs %0, cntpct_el0" : "=r" (counter));
+	snprintf(state, sizeof(state),
+		 "X620_CONTEXT EL=%llu SCTLR=%llx FDT=%llx CNTFRQ=%llu CNTPCT=%llx UART_LSR=%x\n",
+		 x620_entry_state[4] >> 2, x620_entry_state[5], x620_entry_state[0],
+		 frequency, counter, readl((void *)0x11002014));
+	x620_log(state);
+	snprintf(state, sizeof(state),
+		 "X620_DISPLAY CON=%x PITCH=%x LAYERS=%x DSI_STATUS=%x DSI_START=%x MUTEX=%x\n",
+		 readl((void *)0x1400b030), readl((void *)0x1400b044),
+		 readl((void *)0x1400b02c), readl((void *)0x1401c00c),
+		 readl((void *)0x1401c000), readl((void *)0x1401f020));
+	x620_log(state);
+	return 0;
+}
+EVENT_SPY_SIMPLE(EVT_MAIN_LOOP, x620_main_loop);
+
+static int x620_post_preboot(void)
+{
+	x620_log("X620_POST_PREBOOT\n");
+	return 0;
+}
+EVENT_SPY_SIMPLE(EVT_POST_PREBOOT, x620_post_preboot);
+
 static int do_x620diag(struct cmd_tbl *cmdtp, int flag, int argc,
 		       char *const argv[])
 {
@@ -127,8 +196,10 @@ static int do_x620diag(struct cmd_tbl *cmdtp, int flag, int argc,
 	int ret = x620_get_framebuffer(&fb, &size);
 	char marker[192];
 
+	x620_log("X620_DIAG_BEGIN\n");
 	printf("X620 U-Boot relay: EL%llu entry-SCTLR=%llx\n",
 	       x620_entry_state[4] >> 2, x620_entry_state[5]);
+	x620_log("X620_DIAG_HEADER_PRINTED\n");
 	printf("LK args: %llx %llx %llx %llx; DTB %s\n",
 	       x620_entry_state[0], x620_entry_state[1], x620_entry_state[2],
 	       x620_entry_state[3], lk_fdt() ? "valid" : "invalid");
@@ -152,6 +223,7 @@ static int do_x620diag(struct cmd_tbl *cmdtp, int flag, int argc,
 		 x620_entry_state[4] >> 2, x620_entry_state[5], x620_entry_state[0],
 		 gd->relocaddr, readl((void *)0x10007000));
 	x620_log(marker);
+	x620_log("X620_DIAG_DONE\n");
 	return 0;
 }
 

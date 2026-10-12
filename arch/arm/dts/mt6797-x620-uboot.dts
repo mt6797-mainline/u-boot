@@ -32,12 +32,19 @@
 		reg = <0 0x11290000 0 0x10000>;
 		#phy-cells = <0>;
 	};
+	usb_clocks: clock-controller@10001000 {
+		compatible = "leeco,x620-lk-usb-clocks";
+		reg = <0 0x10001000 0 0x1000>;
+		#clock-cells = <1>;
+	};
 	usb@11280700 {
 		compatible = "mediatek,mtu3";
 		reg = <0 0x11280700 0 0x100>;
 		reg-names = "ippc";
 		vusb33-supply = <&lk_vusb>;
 		phys = <&usb_phy>;
+		clocks = <&usb_clocks 0>, <&usb_clocks 1>, <&usb_clocks 2>;
+		clock-names = "bus", "sys", "ref";
 		#address-cells = <2>;
 		#size-cells = <2>;
 		ranges;

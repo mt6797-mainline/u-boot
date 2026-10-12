@@ -15,6 +15,7 @@ config TARGET_MT6797_X620
 	select LINUX_KERNEL_IMAGE_HEADER
 	select BOARD_EARLY_INIT_F
 	select BOARD_LATE_INIT
+	select EVENT
 	select HAS_CUSTOM_SYS_INIT_SP_ADDR
 	help
 	  U-Boot proper loaded through the stock Android boot image path.

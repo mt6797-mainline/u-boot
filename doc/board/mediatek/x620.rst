@@ -48,34 +48,76 @@ Display and USB
 The retained display driver accepts only the live packed videolfb tag for
 panel 378C81, bounded to the mapped framebuffer range. It checks OVL0,
 layer-0 address and pitch, and DSI0 command mode before removing the logo
-overlay. A bounded DSI busy wait precedes display-mutex and DSI-start
-triggers. It does not implement full panel, DDP or power-domain bring-up.
-In the first X620 device test, the displayed picture disappeared and only
-the backlight remained on. A working display console has not been established.
+overlay and disabling layer-0 alpha blending for U-Boot's XRGB8888 pixels.
+DSI BUSY makes the refresh callback return immediately and retry
+at a later sync; it never polls through udelay(), which would schedule a
+second video refresh from inside the first. It does not implement full
+panel, DDP or power-domain bring-up.
+The owner confirmed screen text and USB operation after flashing the image
+with this takeover fix; no manual register changes were needed after boot.
 
 USB uses the upstream MTU3 gadget driver with MT6797 MAC/IPPC addresses
 and a board-specific USB2 PHY recovery sequence derived from the reference
-kernel. Supply and PLL calibration are inherited from LK; Type-C policy
+kernel. A board clock provider exposes the three required bus/sys/ref clocks
+and ungates their INFRA2 bits while retaining LK's PLL/mux selections.
+Supply and PLL calibration are inherited from LK; Type-C policy
 and PMIC initialization are not implemented. USB3 operation is disabled.
 Fastboot flashing is disabled. Download, FIT/Android boot support and
 ``fastboot oem console`` are compiled in, with a diagnostic polling loop.
-USB did not work in that first device test; enumeration and downloads are
-not established on hardware.
+Fastboot enumeration, console reads and OEM shell commands have been
+validated on hardware. Download transfers and Linux boot on X620 remain
+unvalidated.
 
 The default boot command prints handoff diagnostics, attempts USB fastboot,
 and remains in U-Boot with a five-second heartbeat. It does not automatically
 boot Linux. A UART Ctrl-C returns to the U-Boot shell; USB fastboot
 ``continue`` exits the USB loop into the heartbeat command.
 
+Autoboot uses a delay of -2 to bypass UART-key abort checks. Text now goes to
+both serial and vidconsole after correcting layer blending. Output is also
+recorded for ``fastboot oem console``. Serial-only output was used to isolate
+the display failure while bringing up USB.
+``fastboot oem run:'x620diag'`` can run diagnostics once USB is available.
+Persistent main-loop and diagnostic-command markers bracket console output;
+the main-loop marker captures counter frequency, UART LSR and display state.
+
+ARM64 fatal exception handlers record the first ESR, FAR, ELR, link-time PC
+and x0-x3 before attempting console output. PANIC_HANG keeps fatal reports
+in RAM until manual reset. A power-off can still discard those records.
+
 Build and validation
 --------------------
 
-The first device test was reported against the 3,049,472-byte Android boot
-image with SHA256
-``e1b0658d93df03d216cc52a20c875bd819bd1c55b3a2e5313a7192782af4ea5a``.
-The owner reported a response followed by loss of the picture with backlight
-remaining on, and USB unavailable. No device logs were collected for this
-attempt yet, so the reached U-Boot stage and watchdog behavior are unknown.
+Hardware validation on 2026-10-13 used the 3,051,520-byte boot image with
+SHA256
+``2cbb31c29f482b6935279a2d624e7d058be2fcfbf838d9de50f6d8afd8ac5240``.
+After flashing, the owner confirmed both display and USB working at startup.
+This image is preserved as the tested binary; committing its sources does
+not rebuild or replace it merely to update the version banner.
+
+Earlier live tests confirmed EL2 entry, CNTFRQ 13 MHz, a valid LK DTB at
+0x44000000, relocation at 0x4ff9e000, and at least 130 seconds of diagnostic
+heartbeats. Windows fastboot identified ``X620-UBOOT-RELAY`` and returned the
+console log and OEM register reads.
+
+The display diagnosis was verified independently of the text renderer:
+opaque white written to 0xbd0c0000..0xbd8b8000 appeared after selecting layer
+0 and pulsing mutex 0 and DSI_START. Reading back a rendered X found the
+expected bitmap with foreground 0x00c0c0c0, while L0_CON was 0x21ff. Clearing
+only AEN (L0_CON=0x20ff) made the glyph visible. Diagnostic text and five-second
+USB heartbeats then appeared with serial and vidconsole output enabled.
+
+The first USB DT lacked mandatory clocks, so clk_get_bulk() returned before
+PHY setup. The three clock specifiers and INFRA2 gate provider now allow
+probe to reach the controller. The diagnostic command retains the underlying
+probe errno instead of the generic UDC helper's masked -ENODEV.
+
+Software validation includes an ARM64 cross-build, boot container and
+measured partition-size checks, QEMU entry/relocation/60-second heartbeat and
+Linux rescue /init handoff, a 10,000-call BUSY callback test, alpha-bit
+preservation checks and injected translation-fault recording. QEMU does not
+emulate the MT6797 display or USB hardware. Linux handoff on the actual X620,
+eMMC loading and USB3 remain outside the validated capabilities.
 
 The source checkout includes ``board/mediatek/x620/x620.config`` as the
 initial production build configuration. To build the U-Boot binary alone::
@@ -98,3 +140,8 @@ PL011 control DT. ``scripts/test-uboot-qemu.py`` supplies the real captured LK
 DT at 0x44000000 through a register-setting shim, checks entry and relocation
 markers and a 60-second heartbeat, then exercises ``booti`` with the archived
 Linux rescue payload. It does not emulate MT6797 display, USB or watchdog IO.
+The USB fixture supplies the production resource bindings with a RAM-backed
+zero IPPC status region. It verifies all three clock requests, PHY setup and
+an expected hardware-clock timeout without claiming USB enumeration support.
+``scripts/test-uboot-qemu.py --fault-only`` injects a translation fault and
+checks the persistent exception report before console output.

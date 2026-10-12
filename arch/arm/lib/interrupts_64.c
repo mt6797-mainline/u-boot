@@ -12,6 +12,12 @@
 #include <efi_loader.h>
 #include <semihosting.h>
 
+#ifdef CONFIG_TARGET_MT6797_X620
+#include <asm/arch/x620.h>
+#else
+#define x620_record_exception(kind, regs) do {} while (0)
+#endif
+
 DECLARE_GLOBAL_DATA_PTR;
 
 int interrupt_init(void)
@@ -146,6 +152,7 @@ static bool smh_emulate_trap(struct pt_regs *regs)
 void do_bad_sync(struct pt_regs *pt_regs)
 {
 	efi_restore_gd();
+	x620_record_exception("bad-sync", pt_regs);
 	printf("Bad mode in \"Synchronous Abort\" handler, esr 0x%08lx\n",
 	       pt_regs->esr);
 	show_regs(pt_regs);
@@ -159,6 +166,7 @@ void do_bad_sync(struct pt_regs *pt_regs)
 void do_bad_irq(struct pt_regs *pt_regs)
 {
 	efi_restore_gd();
+	x620_record_exception("bad-irq", pt_regs);
 	printf("Bad mode in \"Irq\" handler, esr 0x%08lx\n", pt_regs->esr);
 	show_regs(pt_regs);
 	show_efi_loaded_images(pt_regs);
@@ -171,6 +179,7 @@ void do_bad_irq(struct pt_regs *pt_regs)
 void do_bad_fiq(struct pt_regs *pt_regs)
 {
 	efi_restore_gd();
+	x620_record_exception("bad-fiq", pt_regs);
 	printf("Bad mode in \"Fiq\" handler, esr 0x%08lx\n", pt_regs->esr);
 	show_regs(pt_regs);
 	show_efi_loaded_images(pt_regs);
@@ -183,6 +192,7 @@ void do_bad_fiq(struct pt_regs *pt_regs)
 void do_bad_error(struct pt_regs *pt_regs)
 {
 	efi_restore_gd();
+	x620_record_exception("bad-error", pt_regs);
 	printf("Bad mode in \"Error\" handler, esr 0x%08lx\n", pt_regs->esr);
 	show_regs(pt_regs);
 	show_efi_loaded_images(pt_regs);
@@ -198,6 +208,7 @@ void do_sync(struct pt_regs *pt_regs)
 	    smh_emulate_trap(pt_regs))
 		return;
 	efi_restore_gd();
+	x620_record_exception("sync", pt_regs);
 	printf("\"Synchronous Abort\" handler, esr 0x%08lx", pt_regs->esr);
 	dump_far(pt_regs->esr);
 	printf("\n");
@@ -212,6 +223,7 @@ void do_sync(struct pt_regs *pt_regs)
 void do_irq(struct pt_regs *pt_regs)
 {
 	efi_restore_gd();
+	x620_record_exception("irq", pt_regs);
 	printf("\"Irq\" handler, esr 0x%08lx\n", pt_regs->esr);
 	show_regs(pt_regs);
 	show_efi_loaded_images(pt_regs);
@@ -224,6 +236,7 @@ void do_irq(struct pt_regs *pt_regs)
 void do_fiq(struct pt_regs *pt_regs)
 {
 	efi_restore_gd();
+	x620_record_exception("fiq", pt_regs);
 	printf("\"Fiq\" handler, esr 0x%08lx\n", pt_regs->esr);
 	show_regs(pt_regs);
 	show_efi_loaded_images(pt_regs);
@@ -239,6 +252,7 @@ void do_fiq(struct pt_regs *pt_regs)
 void __weak do_error(struct pt_regs *pt_regs)
 {
 	efi_restore_gd();
+	x620_record_exception("error", pt_regs);
 	printf("\"Error\" handler, esr 0x%08lx\n", pt_regs->esr);
 	show_regs(pt_regs);
 	show_efi_loaded_images(pt_regs);

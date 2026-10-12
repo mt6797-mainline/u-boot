@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
 #include <command.h>
+#include <clk.h>
+#include <clk-uclass.h>
 #include <dm.h>
+#include <dm/uclass.h>
 #include <g_dnl.h>
 #include <fastboot.h>
 #include <generic-phy.h>
@@ -8,6 +11,42 @@
 #include <linux/usb/gadget.h>
 #include <asm/io.h>
 #include "x620.h"
+
+/* Retain LK's PLL/mux settings; implement only the required INFRA2 gates. */
+static int x620_usb_clock_enable(struct clk *clk)
+{
+	static const u32 gates[] = { BIT(18), BIT(24), BIT(9) };
+	void *base = (void *)dev_read_addr(clk->dev);
+	char line[64];
+
+	if (clk->id >= ARRAY_SIZE(gates))
+		return -EINVAL;
+	writel(gates[clk->id], base + 0xac);
+	snprintf(line, sizeof(line), "X620_USB_CLOCK_ON id=%lu\n", clk->id);
+	x620_log(line);
+	return 0;
+}
+
+static int x620_usb_clock_disable(struct clk *clk)
+{
+	/* Failed probes must preserve inherited clock and supply state. */
+	return 0;
+}
+
+static const struct clk_ops x620_usb_clock_ops = {
+	.enable = x620_usb_clock_enable,
+	.disable = x620_usb_clock_disable,
+};
+static const struct udevice_id x620_usb_clock_ids[] = {
+	{ .compatible = "leeco,x620-lk-usb-clocks" },
+	{ }
+};
+U_BOOT_DRIVER(x620_usb_clocks) = {
+	.name = "x620_usb_clocks",
+	.id = UCLASS_CLK,
+	.of_match = x620_usb_clock_ids,
+	.ops = &x620_usb_clock_ops,
+};
 
 /* USB2 recovery sequence from the MT6797 reference PHY driver:
  * drivers/misc/mediatek/mu3phy/mt6797/mtk-phy-asic.c, usb_phy_recover().
@@ -20,8 +59,6 @@ static int x620_usb_phy_on(struct phy *phy)
 	void *u2 = base + 0x800;
 
 	x620_log("X620_USB_PHY_START\n");
-	/* INFRA2 SSUSB bus/sys/ref gates, reference clk-mt6797.c. */
-	writel(BIT(18) | BIT(24) | BIT(9), (void *)0x100010ac);
 	udelay(50);
 	clrsetbits_le32(u2 + 0x18, BIT(31) | BIT(23) | 0xf, BIT(20) | 2);
 	clrbits_le32(u2 + 0x20, BIT(9) | BIT(8));
@@ -61,10 +98,12 @@ static int do_x620usb(struct cmd_tbl *cmdtp, int flag, int argc,
 	int ret;
 
 	x620_log("X620_USB_PROBE\n");
-	ret = udc_device_get_by_index(0, &udc);
+	/* Preserve the actual probe errno; the generic UDC helper masks it. */
+	ret = uclass_get_device(UCLASS_USB_GADGET_GENERIC, 0, &udc);
 	if (ret) {
 		printf("X620 USB controller probe failed: %d\n", ret);
-		x620_log("X620_USB_PROBE_FAILED\n");
+		snprintf(line, sizeof(line), "X620_USB_PROBE_FAILED ret=%d\n", ret);
+		x620_log(line);
 		return CMD_RET_FAILURE;
 	}
 	g_dnl_clear_detach();
@@ -72,6 +111,8 @@ static int do_x620usb(struct cmd_tbl *cmdtp, int flag, int argc,
 	g_dnl_set_serialnumber("X620-UBOOT-RELAY");
 	ret = g_dnl_register("usb_dnl_fastboot");
 	if (ret) {
+		snprintf(line, sizeof(line), "X620_USB_REGISTER_FAILED ret=%d\n", ret);
+		x620_log(line);
 		udc_device_put(udc);
 		return CMD_RET_FAILURE;
 	}
