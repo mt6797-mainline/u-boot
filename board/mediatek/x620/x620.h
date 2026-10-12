@@ -6,4 +6,6 @@ extern u64 x620_entry_state[6];
 void x620_log(const char *message);
 int x620_get_framebuffer(ulong *base, u32 *size);
 int x620_display_sync(void);
+void x620_fastboot_prepare(void);
+bool x620_fastboot_run(void);
 #endif

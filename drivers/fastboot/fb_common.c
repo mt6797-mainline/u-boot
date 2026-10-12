@@ -148,7 +148,7 @@ void (*fastboot_get_progress_callback(void))(const char *)
  * Otherwise execute "bootm <fastboot_buf_addr>", if that fails, reset
  * the board.
  */
-void fastboot_boot(void)
+void __weak fastboot_boot(void)
 {
 	char *s;
 

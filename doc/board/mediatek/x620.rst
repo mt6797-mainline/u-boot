@@ -65,13 +65,50 @@ and PMIC initialization are not implemented. USB3 operation is disabled.
 Fastboot flashing is disabled. Download, FIT/Android boot support and
 ``fastboot oem console`` are compiled in, with a diagnostic polling loop.
 Fastboot enumeration, console reads and OEM shell commands have been
-validated on hardware. Download transfers and Linux boot on X620 remain
-unvalidated.
+validated on hardware. The owner subsequently confirmed visible Linux
+startup after the download-boot test with the deferred handoff below.
 
 The default boot command prints handoff diagnostics, attempts USB fastboot,
 and remains in U-Boot with a five-second heartbeat. It does not automatically
 boot Linux. A UART Ctrl-C returns to the U-Boot shell; USB fastboot
 ``continue`` exits the USB loop into the heartbeat command.
+
+Downloaded Linux and stock LK relocking
+--------------------------------------
+
+Static analysis of the owner's LK backup found that its fastboot ``reboot``
+and ``reboot-bootloader`` handlers call a shared lock flow at 0x4602b8bc.
+Its ``boot`` handler calls that flow before jumping and on a failure path.
+The flow reaches the same lock helper as ``oem lock`` and invokes the lock
+state updater with argument 1. Avoid those stock LK commands for bring-up.
+
+X620 overrides U-Boot's default fastboot boot callback to queue the request.
+The USB loop unregisters the gadget and releases the UDC before executing
+``bootm 0x48000000`` (or an explicit ``fastboot_bootcmd`` override). If the
+loader returns, the loop reopens fastboot instead of resetting the phone.
+This prevents a malformed download from discarding its error report and
+keeps kernel handoff outside the gadget completion callback. It does not
+modify LK or the device's stored unlock state. An explicit U-Boot reboot
+still restarts through stock firmware; boot firmware effects are untested.
+
+The companion workspace builds ``dist/linux-boot.img`` as an Android v2 RAM
+download payload, containing a gzip Linux 6.12 Image, diagnostic initrd and
+a distinct mainline board DT. ``dist/boot.img`` remains the stock LK-facing
+U-Boot relay image. Download Linux with ``fastboot boot linux-boot.img`` only
+after confirming serial ``X620-UBOOT-RELAY`` and the U-Boot version response.
+Do not flash the Linux RAM payload over the relay's boot partition.
+
+The first Linux profile uses one CPU and 512 MiB of RAM, preserves firmware
+clocks and power domains, and uses simplefb plus a guarded command-mode
+refresh worker. A temporary early console writes the vendor-compatible
+persistent log at 0x444bf000, expanding from one page to 64 KiB once ioremap
+is available. Linux USB gadget support on this board is not wired up yet;
+loss of the U-Boot USB function after kernel entry is expected. The new
+Android bootm path, diagnostic PID 1 and retained-display refresh worker
+passed QEMU tests with virtual UART and RAM register fixtures. Actual
+The owner confirmed seeing the requested Linux startup output on X620 on
+2026-10-13. This is an owner-reported boot milestone, without captured device
+logs or shell access; USB gadget and storage support remain unvalidated.
 
 Autoboot uses a delay of -2 to bypass UART-key abort checks. Text now goes to
 both serial and vidconsole after correcting layer blending. Output is also
@@ -116,8 +153,9 @@ Software validation includes an ARM64 cross-build, boot container and
 measured partition-size checks, QEMU entry/relocation/60-second heartbeat and
 Linux rescue /init handoff, a 10,000-call BUSY callback test, alpha-bit
 preservation checks and injected translation-fault recording. QEMU does not
-emulate the MT6797 display or USB hardware. Linux handoff on the actual X620,
-eMMC loading and USB3 remain outside the validated capabilities.
+emulate the MT6797 display or USB hardware. The subsequent Linux download
+test received the owner's confirmation of visible startup. eMMC loading,
+Linux USB gadget support and USB3 remain outside the validated capabilities.
 
 The source checkout includes ``board/mediatek/x620/x620.config`` as the
 initial production build configuration. To build the U-Boot binary alone::

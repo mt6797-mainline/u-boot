@@ -97,6 +97,8 @@ static int do_x620usb(struct cmd_tbl *cmdtp, int flag, int argc,
 	char line[80];
 	int ret;
 
+restart:
+	x620_fastboot_prepare();
 	x620_log("X620_USB_PROBE\n");
 	/* Preserve the actual probe errno; the generic UDC helper masks it. */
 	ret = uclass_get_device(UCLASS_USB_GADGET_GENERIC, 0, &udc);
@@ -134,6 +136,9 @@ static int do_x620usb(struct cmd_tbl *cmdtp, int flag, int argc,
 	g_dnl_unregister();
 	udc_device_put(udc);
 	g_dnl_clear_detach();
+	/* Leave the IRQ callback and stop USB DMA before loading Linux. */
+	if (x620_fastboot_run())
+		goto restart;
 	return CMD_RET_SUCCESS;
 }
 U_BOOT_CMD(x620usb, 1, 0, do_x620usb, "run USB fastboot with relay diagnostics", "");
