@@ -1094,7 +1094,7 @@ mt8371-genio-520-evk-ufs-dtbs := mt8371-genio-520-evk.dtb mt8371-genio-common-uf
 mt8391-genio-720-evk-ufs-dtbs := mt8391-genio-720-evk.dtb mt8371-genio-common-ufs.dtbo
 
 ifeq ($(CONFIG_TARGET_MT6797_X620),y)
-dtb-y += mt6797-x620-uboot.dtb
+dtb-y += mt6797-leeco-x620.dtb
 else
 dtb-$(CONFIG_ARCH_MEDIATEK) += \
 	mt7622-rfb.dtb \

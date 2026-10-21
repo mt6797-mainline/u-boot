@@ -2,7 +2,7 @@
 from pathlib import Path
 import subprocess
 import os
-workspace=Path(os.environ.get('X620_WORKSPACE', Path(__file__).resolve().parents[3]))
+workspace=Path(os.environ.get('MT6797_WORKSPACE') or os.environ.get('X620_WORKSPACE', Path(__file__).resolve().parents[3]))
 base=workspace/'out/mt6797-persistent'
 base.mkdir(parents=True,exist_ok=True)
 root=base.parents[1]

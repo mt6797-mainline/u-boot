@@ -9,7 +9,7 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-static struct mm_region x620_mem_map[] = {
+static struct mm_region mt6797_mem_map[] = {
 	{ .virt = 0, .phys = 0, .size = 0x40000000,
 	  .attrs = PTE_BLOCK_MEMTYPE(MT_DEVICE_NGNRNE) |
 		   PTE_BLOCK_NON_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN },
@@ -21,7 +21,7 @@ static struct mm_region x620_mem_map[] = {
 		   PTE_BLOCK_OUTER_SHARE | PTE_BLOCK_PXN | PTE_BLOCK_UXN },
 	{ }
 };
-struct mm_region *mem_map = x620_mem_map;
+struct mm_region *mem_map = mt6797_mem_map;
 
 int dram_init(void)
 {

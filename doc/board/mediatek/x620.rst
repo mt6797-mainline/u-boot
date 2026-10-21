@@ -157,11 +157,11 @@ emulate the MT6797 display or USB hardware. The subsequent Linux download
 test received the owner's confirmation of visible startup. eMMC loading,
 Linux USB gadget support and USB3 remain outside the validated capabilities.
 
-The source checkout includes ``board/mediatek/x620/x620.config`` as the
+The source checkout includes ``board/mediatek/x620/mt6797_x620.config`` as the
 initial production build configuration. To build the U-Boot binary alone::
 
     mkdir -p /tmp/x620-uboot-build
-    cp board/mediatek/x620/x620.config /tmp/x620-uboot-build/.config
+    cp board/mediatek/x620/mt6797_x620.config /tmp/x620-uboot-build/.config
     make O=/tmp/x620-uboot-build CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
     make O=/tmp/x620-uboot-build CROSS_COMPILE=aarch64-linux-gnu- -j10 u-boot.bin
 

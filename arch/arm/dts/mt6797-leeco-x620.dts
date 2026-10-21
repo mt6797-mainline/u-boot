@@ -42,12 +42,12 @@
 		regulator-always-on;
 	};
 	usb_phy: phy@11290000 {
-		compatible = "leeco,x620-usb2-phy";
+		compatible = "mediatek,mt6797-lk-usb2-phy", "leeco,x620-usb2-phy";
 		reg = <0 0x11290000 0 0x10000>;
 		#phy-cells = <0>;
 	};
 	usb_clocks: clock-controller@10001000 {
-		compatible = "leeco,x620-lk-usb-clocks";
+		compatible = "mediatek,mt6797-lk-usb-clocks", "leeco,x620-lk-usb-clocks";
 		reg = <0 0x10001000 0 0x1000>;
 		#clock-cells = <1>;
 	};

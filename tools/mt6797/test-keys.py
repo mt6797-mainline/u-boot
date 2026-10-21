@@ -2,7 +2,7 @@
 from pathlib import Path
 import subprocess
 import os
-workspace=Path(os.environ.get('X620_WORKSPACE', Path(__file__).resolve().parents[3]))
+workspace=Path(os.environ.get('MT6797_WORKSPACE') or os.environ.get('X620_WORKSPACE', Path(__file__).resolve().parents[3]))
 base=workspace/'out/mt6797-persistent'
 base.mkdir(parents=True,exist_ok=True)
 source=(base.parents[1]/'u-boot/board/mediatek/x620/mt6797-keys.c').read_text()
@@ -30,7 +30,7 @@ static void writew(u16 v,void *reg) { assert(((uintptr_t)reg==0x10010018&&v==0x4
 static void mdelay(unsigned ms) {clock_ms+=ms;}
 static ulong get_timer(ulong start) {return clock_ms-start;}
 static void schedule(void) {}
-static void x620_log(const char *s) {(void)s;}
+static void mt6797_relay_log(const char *s) {(void)s;}
 #define readl_poll_timeout(a,v,cond,t) ({int result=-ETIMEDOUT; for(int i=0;i<3;i++){v=readl(a);if(cond){result=0;break;}} result;})
 '''
 post=r'''

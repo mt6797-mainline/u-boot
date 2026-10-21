@@ -2,15 +2,15 @@
 #include <linux/linkage.h>
 	.section .data
 	.balign 8
-	.global x620_entry_state
-x620_entry_state:
+	.global mt6797_lk_entry_state
+mt6797_lk_entry_state:
 	.quad 0, 0, 0, 0, 0, 0
 	.text
 
 /* Called before any stack or C runtime; retain all four LK arguments. */
 ENTRY(save_boot_params)
-	adrp x9, x620_entry_state
-	add x9, x9, :lo12:x620_entry_state
+	adrp x9, mt6797_lk_entry_state
+	add x9, x9, :lo12:mt6797_lk_entry_state
 	stp x0, x1, [x9]
 	stp x2, x3, [x9, #16]
 	mrs x10, CurrentEL

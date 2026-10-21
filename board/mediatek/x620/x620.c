@@ -12,7 +12,7 @@
 #include <linux/libfdt.h>
 #include <asm/unaligned.h>
 #include <asm/cache.h>
-#include <asm/arch/x620.h>
+#include <asm/arch/mt6797.h>
 #include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/ptrace.h>
@@ -23,7 +23,7 @@ DECLARE_GLOBAL_DATA_PTR;
 #define LOG_BASE 0x444bf000UL
 #define LOG_LIMIT (4096 - 12)
 
-void x620_log(const char *message)
+void mt6797_relay_log(const char *message)
 {
 	u32 n = readl((void *)(LOG_BASE + 8));
 	volatile u8 *data = (void *)(LOG_BASE + 12);
@@ -37,7 +37,7 @@ void x620_log(const char *message)
 	flush_dcache_range(LOG_BASE, LOG_BASE + 4096);
 }
 
-void x620_record_exception(const char *kind, struct pt_regs *regs)
+void mt6797_record_exception(const char *kind, struct pt_regs *regs)
 {
 	static bool recorded;
 	ulong far = 0, el = current_el();
@@ -47,7 +47,7 @@ void x620_record_exception(const char *kind, struct pt_regs *regs)
 	if (recorded)
 		return;
 	recorded = true;
-	x620_log("X620_EXCEPTION_BEGIN\n");
+	mt6797_relay_log("X620_EXCEPTION_BEGIN\n");
 	if (el == 1)
 		asm volatile("mrs %0, far_el1" : "=r" (far));
 	else if (el == 2)
@@ -59,15 +59,15 @@ void x620_record_exception(const char *kind, struct pt_regs *regs)
 		 kind, el, regs->esr, far, regs->elr,
 		 regs->elr - (gd->flags & GD_FLG_RELOC ? gd->reloc_off : 0),
 		 regs->regs[30], regs->spsr);
-	x620_log(line);
+	mt6797_relay_log(line);
 	snprintf(line, sizeof(line), "X620_FAULT_ARGS X0=%lx X1=%lx X2=%lx X3=%lx\n",
 		 regs->regs[0], regs->regs[1], regs->regs[2], regs->regs[3]);
-	x620_log(line);
+	mt6797_relay_log(line);
 }
 
 static const void *lk_fdt(void)
 {
-	ulong addr = x620_entry_state[0];
+	ulong addr = mt6797_lk_entry_state[0];
 	const void *fdt = (void *)addr;
 
 	if (addr < 0x40000000 || addr > 0x45e00000 || (addr & 7))
@@ -107,14 +107,14 @@ int x620_get_framebuffer(ulong *base, u32 *size)
 
 int board_early_init_f(void)
 {
-	x620_log("X620_UBOOT_EARLY_C\n");
+	mt6797_relay_log("X620_UBOOT_EARLY_C\n");
 	return 0;
 }
 
 int board_init(void)
 {
 	gd->bd->bi_boot_params = 0x47000000;
-	x620_log("X620_UBOOT_RELOCATED\n");
+	mt6797_relay_log("X620_UBOOT_RELOCATED\n");
 	return 0;
 }
 
@@ -146,14 +146,14 @@ int board_late_init(void)
 		if (ret < 0)
 			return ret;
 	}
-	env_set_hex("lk_fdt_addr", x620_entry_state[0]);
-	x620_log("X620_UBOOT_READY\n");
+	env_set_hex("lk_fdt_addr", mt6797_lk_entry_state[0]);
+	mt6797_relay_log("X620_UBOOT_READY\n");
 	return 0;
 }
 
 static int x620_last_stage(void)
 {
-	x620_log("X620_LAST_STAGE_INIT\n");
+	mt6797_relay_log("X620_LAST_STAGE_INIT\n");
 	return 0;
 }
 EVENT_SPY_SIMPLE(EVT_LAST_STAGE_INIT, x620_last_stage);
@@ -163,27 +163,27 @@ static int x620_main_loop(void)
 	u64 frequency, counter;
 	char state[192];
 
-	x620_log("X620_MAIN_LOOP\n");
+	mt6797_relay_log("X620_MAIN_LOOP\n");
 	asm volatile("mrs %0, cntfrq_el0" : "=r" (frequency));
 	asm volatile("mrs %0, cntpct_el0" : "=r" (counter));
 	snprintf(state, sizeof(state),
 		 "X620_CONTEXT EL=%llu SCTLR=%llx FDT=%llx CNTFRQ=%llu CNTPCT=%llx UART_LSR=%x\n",
-		 x620_entry_state[4] >> 2, x620_entry_state[5], x620_entry_state[0],
+		 mt6797_lk_entry_state[4] >> 2, mt6797_lk_entry_state[5], mt6797_lk_entry_state[0],
 		 frequency, counter, readl((void *)0x11002014));
-	x620_log(state);
+	mt6797_relay_log(state);
 	snprintf(state, sizeof(state),
 		 "X620_DISPLAY CON=%x PITCH=%x LAYERS=%x DSI_STATUS=%x DSI_START=%x MUTEX=%x\n",
 		 readl((void *)0x1400b030), readl((void *)0x1400b044),
 		 readl((void *)0x1400b02c), readl((void *)0x1401c00c),
 		 readl((void *)0x1401c000), readl((void *)0x1401f020));
-	x620_log(state);
+	mt6797_relay_log(state);
 	return 0;
 }
 EVENT_SPY_SIMPLE(EVT_MAIN_LOOP, x620_main_loop);
 
 static int x620_post_preboot(void)
 {
-	x620_log("X620_POST_PREBOOT\n");
+	mt6797_relay_log("X620_POST_PREBOOT\n");
 	return 0;
 }
 EVENT_SPY_SIMPLE(EVT_POST_PREBOOT, x620_post_preboot);
@@ -196,13 +196,13 @@ static int do_x620diag(struct cmd_tbl *cmdtp, int flag, int argc,
 	int ret = x620_get_framebuffer(&fb, &size);
 	char marker[192];
 
-	x620_log("X620_DIAG_BEGIN\n");
+	mt6797_relay_log("X620_DIAG_BEGIN\n");
 	printf("X620 U-Boot relay: EL%llu entry-SCTLR=%llx\n",
-	       x620_entry_state[4] >> 2, x620_entry_state[5]);
-	x620_log("X620_DIAG_HEADER_PRINTED\n");
+	       mt6797_lk_entry_state[4] >> 2, mt6797_lk_entry_state[5]);
+	mt6797_relay_log("X620_DIAG_HEADER_PRINTED\n");
 	printf("LK args: %llx %llx %llx %llx; DTB %s\n",
-	       x620_entry_state[0], x620_entry_state[1], x620_entry_state[2],
-	       x620_entry_state[3], lk_fdt() ? "valid" : "invalid");
+	       mt6797_lk_entry_state[0], mt6797_lk_entry_state[1], mt6797_lk_entry_state[2],
+	       mt6797_lk_entry_state[3], lk_fdt() ? "valid" : "invalid");
 	printf("Relocated to %lx; RAM allocator 48000000..50000000\n",
 	       gd->relocaddr);
 	printf("AP WDT mode=%08x status=%08x\n",
@@ -220,10 +220,10 @@ static int do_x620diag(struct cmd_tbl *cmdtp, int flag, int argc,
 	}
 	snprintf(marker, sizeof(marker),
 		 "X620_DIAG EL=%llu SCTLR=%llx FDT=%llx RELOC=%lx WDT=%x\n",
-		 x620_entry_state[4] >> 2, x620_entry_state[5], x620_entry_state[0],
+		 mt6797_lk_entry_state[4] >> 2, mt6797_lk_entry_state[5], mt6797_lk_entry_state[0],
 		 gd->relocaddr, readl((void *)0x10007000));
-	x620_log(marker);
-	x620_log("X620_DIAG_DONE\n");
+	mt6797_relay_log(marker);
+	mt6797_relay_log("X620_DIAG_DONE\n");
 	return 0;
 }
 
@@ -241,7 +241,7 @@ static int do_x620stay(struct cmd_tbl *cmdtp, int flag, int argc,
 			last = seconds;
 			snprintf(marker, sizeof(marker), "X620_ALIVE %lu seconds\n", seconds);
 			puts(marker);
-			x620_log(marker);
+			mt6797_relay_log(marker);
 		}
 		mdelay(50);
 	}

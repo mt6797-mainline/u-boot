@@ -211,7 +211,7 @@ config SYS_BOARD
 	  be used.
 
 config SYS_CONFIG_NAME
-	default "x620" if TARGET_MT6797_X620
+	default "mt6797_x620" if TARGET_MT6797_X620
 	default "mt7623" if TARGET_MT7623
 	default "mt7629" if TARGET_MT7629
 	default "mt7981" if TARGET_MT7981

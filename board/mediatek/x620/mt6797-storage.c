@@ -234,7 +234,7 @@ static int do_mt6797boot(struct cmd_tbl *cmdtp, int flag, int argc, char *const 
 	    mt6797_image_size(buffer, part.size * 512, false, &bytes))
 		goto fail;
 	printf("MT6797: loading persistent boot (%u bytes)\n", bytes);
-	x620_log("MT6797_PERSISTENT_BOOT_READ\n");
+	mt6797_relay_log("MT6797_PERSISTENT_BOOT_READ\n");
 	if (blk_dread(desc, part.start, bytes / 512, buffer) != bytes / 512)
 		goto fail;
 	ret = run_command("bootm 0x48000000", 0);

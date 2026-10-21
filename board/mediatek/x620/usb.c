@@ -13,7 +13,7 @@
 #include "x620.h"
 
 /* Retain LK's PLL/mux settings; implement only the required INFRA2 gates. */
-static int x620_usb_clock_enable(struct clk *clk)
+static int mt6797_usb_clock_enable(struct clk *clk)
 {
 	static const u32 gates[] = { BIT(18), BIT(24), BIT(9) };
 	void *base = (void *)dev_read_addr(clk->dev);
@@ -23,29 +23,30 @@ static int x620_usb_clock_enable(struct clk *clk)
 		return -EINVAL;
 	writel(gates[clk->id], base + 0xac);
 	snprintf(line, sizeof(line), "X620_USB_CLOCK_ON id=%lu\n", clk->id);
-	x620_log(line);
+	mt6797_relay_log(line);
 	return 0;
 }
 
-static int x620_usb_clock_disable(struct clk *clk)
+static int mt6797_usb_clock_disable(struct clk *clk)
 {
 	/* Failed probes must preserve inherited clock and supply state. */
 	return 0;
 }
 
-static const struct clk_ops x620_usb_clock_ops = {
-	.enable = x620_usb_clock_enable,
-	.disable = x620_usb_clock_disable,
+static const struct clk_ops mt6797_usb_clock_ops = {
+	.enable = mt6797_usb_clock_enable,
+	.disable = mt6797_usb_clock_disable,
 };
-static const struct udevice_id x620_usb_clock_ids[] = {
+static const struct udevice_id mt6797_usb_clock_ids[] = {
+	{ .compatible = "mediatek,mt6797-lk-usb-clocks" },
 	{ .compatible = "leeco,x620-lk-usb-clocks" },
 	{ }
 };
-U_BOOT_DRIVER(x620_usb_clocks) = {
-	.name = "x620_usb_clocks",
+U_BOOT_DRIVER(mt6797_usb_clocks) = {
+	.name = "mt6797_usb_clocks",
 	.id = UCLASS_CLK,
-	.of_match = x620_usb_clock_ids,
-	.ops = &x620_usb_clock_ops,
+	.of_match = mt6797_usb_clock_ids,
+	.ops = &mt6797_usb_clock_ops,
 };
 
 /* USB2 recovery sequence from the MT6797 reference PHY driver:
@@ -53,12 +54,12 @@ U_BOOT_DRIVER(x620_usb_clocks) = {
  * PMIC rails and PLL calibration remain as initialized by stock LK.
  * SuperSpeed is disabled while proving device-mode USB2.
  */
-static int x620_usb_phy_on(struct phy *phy)
+static int mt6797_usb_phy_on(struct phy *phy)
 {
 	void *base = (void *)dev_read_addr(phy->dev);
 	void *u2 = base + 0x800;
 
-	x620_log("X620_USB_PHY_START\n");
+	mt6797_relay_log("X620_USB_PHY_START\n");
 	udelay(50);
 	clrsetbits_le32(u2 + 0x18, BIT(31) | BIT(23) | 0xf, BIT(20) | 2);
 	clrbits_le32(u2 + 0x20, BIT(9) | BIT(8));
@@ -71,22 +72,23 @@ static int x620_usb_phy_on(struct phy *phy)
 	clrsetbits_le32(u2 + 0x70, GENMASK(19, 16), 9 << 16);
 	udelay(800);
 	clrsetbits_le32(u2 + 0x6c, BIT(4), BIT(5) | BIT(2));
-	x620_log("X620_USB_PHY_READY\n");
+	mt6797_relay_log("X620_USB_PHY_READY\n");
 	return 0;
 }
 
-static const struct phy_ops x620_usb_phy_ops = {
-	.power_on = x620_usb_phy_on,
+static const struct phy_ops mt6797_usb_phy_ops = {
+	.power_on = mt6797_usb_phy_on,
 };
-static const struct udevice_id x620_usb_phy_ids[] = {
+static const struct udevice_id mt6797_usb_phy_ids[] = {
+	{ .compatible = "mediatek,mt6797-lk-usb2-phy" },
 	{ .compatible = "leeco,x620-usb2-phy" },
 	{ }
 };
-U_BOOT_DRIVER(x620_usb2_phy) = {
-	.name = "x620_usb2_phy",
+U_BOOT_DRIVER(mt6797_usb2_phy) = {
+	.name = "mt6797_usb2_phy",
 	.id = UCLASS_PHY,
-	.of_match = x620_usb_phy_ids,
-	.ops = &x620_usb_phy_ops,
+	.of_match = mt6797_usb_phy_ids,
+	.ops = &mt6797_usb_phy_ops,
 };
 
 static int do_x620usb(struct cmd_tbl *cmdtp, int flag, int argc,
@@ -102,14 +104,14 @@ static int do_x620usb(struct cmd_tbl *cmdtp, int flag, int argc,
 		return CMD_RET_SUCCESS;
 
 restart:
-	x620_fastboot_prepare();
-	x620_log("X620_USB_PROBE\n");
+	mt6797_fastboot_prepare();
+	mt6797_relay_log("X620_USB_PROBE\n");
 	/* Preserve the actual probe errno; the generic UDC helper masks it. */
 	ret = uclass_get_device(UCLASS_USB_GADGET_GENERIC, 0, &udc);
 	if (ret) {
 		printf("X620 USB controller probe failed: %d\n", ret);
 		snprintf(line, sizeof(line), "X620_USB_PROBE_FAILED ret=%d\n", ret);
-		x620_log(line);
+		mt6797_relay_log(line);
 		return CMD_RET_FAILURE;
 	}
 	g_dnl_clear_detach();
@@ -118,11 +120,11 @@ restart:
 	ret = g_dnl_register("usb_dnl_fastboot");
 	if (ret) {
 		snprintf(line, sizeof(line), "X620_USB_REGISTER_FAILED ret=%d\n", ret);
-		x620_log(line);
+		mt6797_relay_log(line);
 		udc_device_put(udc);
 		return CMD_RET_FAILURE;
 	}
-	x620_log("X620_USB_FASTBOOT_REGISTERED\n");
+	mt6797_relay_log("X620_USB_FASTBOOT_REGISTERED\n");
 	puts("MT6797 U-Boot: fastboot boot/flash; logical boot preserves relay\n");
 	started = get_timer(0);
 	while (!g_dnl_detach() && !ctrlc()) {
@@ -133,7 +135,7 @@ restart:
 			last = seconds;
 			snprintf(line, sizeof(line), "X620_USB_ALIVE %lu seconds\n", seconds);
 			puts(line);
-			x620_log(line);
+			mt6797_relay_log(line);
 		}
 		schedule();
 	}
@@ -141,9 +143,8 @@ restart:
 	udc_device_put(udc);
 	g_dnl_clear_detach();
 	/* Leave the IRQ callback and stop USB DMA before loading Linux. */
-	if (x620_fastboot_run()) {
+	if (mt6797_fastboot_run())
 		goto restart;
-	}
 	return CMD_RET_SUCCESS;
 }
 U_BOOT_CMD(x620usb, 2, 0, do_x620usb, "run USB fastboot with relay diagnostics",

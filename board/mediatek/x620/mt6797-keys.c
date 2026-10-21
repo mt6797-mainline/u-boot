@@ -64,7 +64,7 @@ bool mt6797_wait_boot_key(void)
 		if (keys && keys == previous) {
 			if (now - pressed_at >= 30) {
 				puts("Volume key: staying in U-Boot fastboot\n");
-				x620_log("MT6797_VOLUME_KEY_FASTBOOT\n");
+				mt6797_relay_log("MT6797_VOLUME_KEY_FASTBOOT\n");
 				return true;
 			}
 		} else {

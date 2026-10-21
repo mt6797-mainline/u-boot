@@ -2,7 +2,7 @@
 from pathlib import Path
 import subprocess
 import os
-workspace=Path(os.environ.get('X620_WORKSPACE', Path(__file__).resolve().parents[3]))
+workspace=Path(os.environ.get('MT6797_WORKSPACE') or os.environ.get('X620_WORKSPACE', Path(__file__).resolve().parents[3]))
 p=workspace/'out/mt6797-persistent'
 p.mkdir(parents=True,exist_ok=True)
 root=p.parents[1]
@@ -30,7 +30,7 @@ static void writel(u32 value,void *addr) {
  else {assert(sequence==2&&(uintptr_t)addr==0x10007014&&value==0x1209&&delay_us==100);sequence=3;longjmp(done,1);}
 }
 static void udelay(int n) {assert(sequence==2);delay_us=n;}
-static void x620_log(const char *s) {(void)s;}
+static void mt6797_relay_log(const char *s) {(void)s;}
 static void g_dnl_trigger_detach(void) {detach=1;}
 static const char *env_get(const char *s) {(void)s;return NULL;}
 static int run_command(const char *s,int flags) {(void)flags;commands++;snprintf(command,sizeof(command),"%s",s);return 0;}
@@ -42,9 +42,9 @@ int main(void) {
   if(!setjmp(done))reset_cpu();
   assert(sequence==3&&written_mode==((old_mode&~(BIT(0)|BIT(3)|BIT(4)|BIT(6)))|0x22000000|BIT(2)|BIT(4)));
  }
- x620_fastboot_prepare();assert(!x620_fastboot_run());
- fastboot_reboot();assert(detach&&commands==0);assert(x620_fastboot_run());assert(commands==1&&!strcmp(command,"reset"));
- x620_fastboot_prepare();fastboot_boot();assert(commands==1);assert(x620_fastboot_run());assert(commands==2&&!strcmp(command,"bootm 0x48000000"));
+ mt6797_fastboot_prepare();assert(!mt6797_fastboot_run());
+ fastboot_reboot();assert(detach&&commands==0);assert(mt6797_fastboot_run());assert(commands==1&&!strcmp(command,"reset"));
+ mt6797_fastboot_prepare();fastboot_boot();assert(commands==1);assert(mt6797_fastboot_run());assert(commands==2&&!strcmp(command,"bootm 0x48000000"));
  puts("TOPRGU_FACTORY_SEQUENCE_AND_DEFERRED_RESET_OK");return 0;
 }
 '''

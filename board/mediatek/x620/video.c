@@ -17,13 +17,13 @@ int x620_display_sync(void)
 	 */
 	if (readl((void *)0x1401c00c) & BIT(31)) {
 		if (!busy_reported) {
-			x620_log("X620_VIDEO_BUSY_SKIP\n");
+			mt6797_relay_log("X620_VIDEO_BUSY_SKIP\n");
 			busy_reported = true;
 		}
 		return 0;
 	}
 	if (busy_reported) {
-		x620_log("X620_VIDEO_BUSY_CLEARED\n");
+		mt6797_relay_log("X620_VIDEO_BUSY_CLEARED\n");
 		busy_reported = false;
 	}
 	dsb();
@@ -49,7 +49,7 @@ static int x620_video_probe(struct udevice *dev)
 	    readl((void *)0x1400bf40) != plat->base ||
 	    (readl((void *)0x1400b044) & 0xffff) != 4352 ||
 	    (readl((void *)0x1401c014) & 3)) {
-		x620_log("X620_VIDEO_UNEXPECTED_LK_STATE\n");
+		mt6797_relay_log("X620_VIDEO_UNEXPECTED_LK_STATE\n");
 		return -ENODEV;
 	}
 	/* Remove the stock opaque logo layer above layer 0. */
@@ -68,7 +68,7 @@ static int x620_video_probe(struct udevice *dev)
 	priv->white_on_black = true;
 	/* The framebuffer has a dedicated noncacheable ARM64 mapping. */
 	video_set_flush_dcache(dev, false);
-	x620_log("X620_VIDEO_READY\n");
+	mt6797_relay_log("X620_VIDEO_READY\n");
 	return 0;
 }
 

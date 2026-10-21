@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0+ */
-#ifndef __CONFIG_X620_H
-#define __CONFIG_X620_H
+#ifndef __CONFIG_MT6797_X620_H
+#define __CONFIG_MT6797_X620_H
 #define CFG_SYS_SDRAM_BASE 0x48000000
 #define CFG_EXTRA_ENV_SETTINGS \
 	"stdin=serial\0" \
