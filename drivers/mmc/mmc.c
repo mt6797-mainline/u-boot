@@ -2224,6 +2224,7 @@ static int mmc_select_mode_and_width(struct mmc *mmc, uint card_caps)
 		for_each_supported_width(card_caps & mwt->widths,
 					 mmc_is_mode_ddr(mwt->mode), ecbw) {
 			enum mmc_voltage old_voltage;
+			const char *stage = "bus-width";
 			pr_debug("trying mode %s width %d (at %d MHz)\n",
 				 mmc_mode_name(mwt->mode),
 				 bus_width(ecbw->cap),
@@ -2257,6 +2258,7 @@ static int mmc_select_mode_and_width(struct mmc *mmc, uint card_caps)
 				}
 			} else {
 				/* configure the bus speed (card) */
+				stage = "card-timing";
 				err = mmc_set_card_speed(mmc, mwt->mode, false);
 				if (err)
 					goto error;
@@ -2294,10 +2296,15 @@ static int mmc_select_mode_and_width(struct mmc *mmc, uint card_caps)
 			}
 
 			/* do a transfer to check the configuration */
+			stage = "readback";
 			err = mmc_read_and_compare_ext_csd(mmc);
 			if (!err)
 				return 0;
 error:
+			if (IS_ENABLED(CONFIG_TARGET_MT6797_X620))
+				printf("MT6797 MMC: mode=%s width=%u stage=%s ret=%d\n",
+				       mmc_mode_name(mwt->mode), bus_width(ecbw->cap),
+				       stage, err);
 			mmc_set_signal_voltage(mmc, old_voltage);
 			/* if an error occurred, revert to a safer bus mode */
 			mmc_switch(mmc, EXT_CSD_CMD_SET_NORMAL,

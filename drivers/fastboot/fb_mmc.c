@@ -21,6 +21,23 @@
 
 #define BOOT_PARTITION_NAME "boot"
 
+int __weak board_fastboot_mmc_part(const char *name, struct blk_desc **desc,
+				 struct disk_partition *part)
+{
+	return -ENOSYS;
+}
+
+int __weak board_fastboot_mmc_write(const char *name, void *buffer, u32 bytes,
+				  char *response)
+{
+	return -ENOSYS;
+}
+
+int __weak board_fastboot_mmc_erase(const char *name, char *response)
+{
+	return -ENOSYS;
+}
+
 static int raw_part_get_info_by_name(struct blk_desc *dev_desc,
 				     const char *name,
 				     struct disk_partition *info)
@@ -318,7 +335,9 @@ int fastboot_mmc_get_part_info(const char *part_name,
 		return -ENOENT;
 	}
 
-	ret = part_get_info_by_name_or_alias(dev_desc, part_name, part_info);
+	ret = board_fastboot_mmc_part(part_name, dev_desc, part_info);
+	if (ret == -ENOSYS)
+		ret = part_get_info_by_name_or_alias(dev_desc, part_name, part_info);
 	if (ret < 0) {
 		switch (ret) {
 		case -ENOSYS:
@@ -369,6 +388,10 @@ void fastboot_mmc_flash_write(const char *cmd, void *download_buffer,
 {
 	struct blk_desc *dev_desc;
 	struct disk_partition info = {0};
+
+	if (board_fastboot_mmc_write(cmd, download_buffer, download_bytes,
+				     response) != -ENOSYS)
+		return;
 
 #ifdef CONFIG_FASTBOOT_MMC_BOOT_SUPPORT
 	if (strcmp(cmd, CONFIG_FASTBOOT_MMC_BOOT1_NAME) == 0) {
@@ -486,6 +509,9 @@ void fastboot_mmc_erase(const char *cmd, char *response)
 	struct blk_desc *dev_desc;
 	struct disk_partition info;
 	struct mmc *mmc = find_mmc_device(CONFIG_FASTBOOT_FLASH_MMC_DEV);
+
+	if (board_fastboot_mmc_erase(cmd, response) != -ENOSYS)
+		return;
 
 #ifdef CONFIG_FASTBOOT_MMC_BOOT_SUPPORT
 	if (strcmp(cmd, CONFIG_FASTBOOT_MMC_BOOT1_NAME) == 0) {

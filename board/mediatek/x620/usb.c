@@ -96,6 +96,10 @@ static int do_x620usb(struct cmd_tbl *cmdtp, int flag, int argc,
 	ulong last = 0, started;
 	char line[80];
 	int ret;
+	bool autoboot = argc == 2 && !strcmp(argv[1], "auto");
+
+	if (autoboot && !mt6797_wait_boot_key())
+		return CMD_RET_SUCCESS;
 
 restart:
 	x620_fastboot_prepare();
@@ -119,7 +123,7 @@ restart:
 		return CMD_RET_FAILURE;
 	}
 	x620_log("X620_USB_FASTBOOT_REGISTERED\n");
-	puts("X620 U-Boot: USB fastboot download/boot; flash commands disabled\n");
+	puts("MT6797 U-Boot: fastboot boot/flash; logical boot preserves relay\n");
 	started = get_timer(0);
 	while (!g_dnl_detach() && !ctrlc()) {
 		ulong seconds = get_timer(started) / 1000;
@@ -137,8 +141,10 @@ restart:
 	udc_device_put(udc);
 	g_dnl_clear_detach();
 	/* Leave the IRQ callback and stop USB DMA before loading Linux. */
-	if (x620_fastboot_run())
+	if (x620_fastboot_run()) {
 		goto restart;
+	}
 	return CMD_RET_SUCCESS;
 }
-U_BOOT_CMD(x620usb, 1, 0, do_x620usb, "run USB fastboot with relay diagnostics", "");
+U_BOOT_CMD(x620usb, 2, 0, do_x620usb, "run USB fastboot with relay diagnostics",
+	   "[auto] - wait 5 seconds; a volume key enters USB, otherwise boot locally");

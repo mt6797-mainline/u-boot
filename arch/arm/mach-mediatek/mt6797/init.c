@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0+
 #include <cpu_func.h>
 #include <init.h>
+#include <linux/delay.h>
 #include <asm/armv8/mmu.h>
 #include <asm/global_data.h>
 #include <asm/system.h>
+#include <asm/io.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -38,7 +40,20 @@ int dram_init_banksize(void)
 
 void reset_cpu(void)
 {
-	psci_system_reset();
+	void *rgu = (void *)0x10007000;
+	u32 mode;
+
+	/* MT6797 factory wdt_arch_reset(1): hardware reset, bypass power key. */
+	writel(0x1971, rgu + 0x08);
+	mode = readl(rgu);
+	mode &= ~(BIT(0) | BIT(3) | BIT(4) | BIT(6));
+	mode |= 0x22000000 | BIT(2) | BIT(4);
+	writel(mode, rgu);
+	udelay(100);
+	writel(0x1209, rgu + 0x14);
+	dsb();
+	while (1)
+		wfi();
 }
 
 int print_cpuinfo(void)

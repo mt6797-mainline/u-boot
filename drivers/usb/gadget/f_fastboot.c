@@ -419,10 +419,15 @@ static int fastboot_tx_write_str(const char *buffer)
 	return fastboot_tx_write(buffer, strlen(buffer));
 }
 
-static void compl_do_reset(struct usb_ep *ep, struct usb_request *req)
+void __weak fastboot_reboot(void)
 {
 	g_dnl_unregister();
 	do_reset(NULL, 0, 0, NULL);
+}
+
+static void compl_do_reset(struct usb_ep *ep, struct usb_request *req)
+{
+	fastboot_reboot();
 }
 
 static unsigned int rx_bytes_expected(struct usb_ep *ep)

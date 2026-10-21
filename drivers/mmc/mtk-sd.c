@@ -310,6 +310,7 @@ struct msdc_compatible {
 	bool default_pad_dly;
 	bool use_internal_cd;
 	bool use_dma_mode;
+	bool mt6797_timing;
 };
 
 struct msdc_delay_phase {
@@ -504,6 +505,10 @@ static int msdc_cmd_done(struct msdc_host *host, int events,
 	}
 
 	if (!(events & MSDC_INT_CMDRDY)) {
+		if (host->dev_comp->mt6797_timing)
+			printf("MT6797 MSDC: CMD%u arg=%08x IRQ=%08x CFG=%08x\n",
+			       cmd->cmdidx, cmd->cmdarg, events,
+			       readl(&host->base->msdc_cfg));
 		if (cmd->cmdidx != MMC_CMD_SEND_TUNING_BLOCK &&
 		    cmd->cmdidx != MMC_CMD_SEND_TUNING_BLOCK_HS200)
 			/*
@@ -675,6 +680,9 @@ static int msdc_pio_read(struct msdc_host *host, u8 *ptr, u32 size)
 		}
 	}
 
+	if (ret && host->dev_comp->mt6797_timing)
+		printf("MT6797 MSDC: PIO read ret=%d IRQ=%08x remaining=%u CFG=%08x\n",
+		       ret, status, size, readl(&host->base->msdc_cfg));
 	return ret;
 }
 
@@ -717,6 +725,9 @@ static int msdc_pio_write(struct msdc_host *host, const u8 *ptr, u32 size)
 		}
 	}
 
+	if (ret && host->dev_comp->mt6797_timing)
+		printf("MT6797 MSDC: PIO write ret=%d IRQ=%08x remaining=%u\n",
+		       ret, status, size);
 	return ret;
 }
 
@@ -1031,11 +1042,13 @@ static void msdc_set_mclk(struct udevice *dev,
 	if (host->sclk <= 52000000) {
 		writel(host->def_tune_para.iocon, &host->base->msdc_iocon);
 		writel(host->def_tune_para.pad_tune,
-		       &host->base->pad_tune);
+		       host->dev_comp->mt6797_timing ?
+		       &host->base->pad_tune0 : &host->base->pad_tune);
 	} else {
 		writel(host->saved_tune_para.iocon, &host->base->msdc_iocon);
 		writel(host->saved_tune_para.pad_tune,
-		       &host->base->pad_tune);
+		       host->dev_comp->mt6797_timing ?
+		       &host->base->pad_tune0 : &host->base->pad_tune);
 	}
 
 	dev_dbg(dev, "sclk: %d, timing: %d\n", host->sclk, timing);
@@ -1535,7 +1548,8 @@ static int msdc_execute_tuning(struct udevice *dev, uint opcode)
 
 tune_done:
 	host->saved_tune_para.iocon = readl(&host->base->msdc_iocon);
-	host->saved_tune_para.pad_tune = readl(&host->base->pad_tune);
+	host->saved_tune_para.pad_tune = readl(host->dev_comp->mt6797_timing ?
+		       &host->base->pad_tune0 : &host->base->pad_tune);
 	host->saved_tune_para.pad_cmd_tune = readl(&host->base->pad_cmd_tune);
 
 	return ret;
@@ -1707,6 +1721,16 @@ static void msdc_init_hw(struct msdc_host *host)
 		       rd_dly1_reg);
 	}
 
+	if (host->dev_comp->mt6797_timing) {
+		/* Factory MT6797 msdc_init_tune_setting/autok_path_sel at 26 MHz. */
+		writel(0xfffe00c0, &host->base->patch_bit1);
+		writel(0, &host->base->pad_tune1);
+		clrsetbits_le32(&host->base->patch_bit2,
+				MSDC_PB2_RESPSTSENSEL | MSDC_PB2_CRCSTSENSEL, 0);
+		clrbits_le32(&host->base->emmc50_cfg0,
+			     BIT(3) | EMMC50_CFG_CFCSTS_SEL | BIT(9));
+	}
+
 	/* Configure to enable SDIO mode otherwise sdio cmd5 won't work */
 	setbits_le32(&host->base->sdc_cfg, SDC_CFG_SDIO);
 
@@ -1718,7 +1742,8 @@ static void msdc_init_hw(struct msdc_host *host)
 			FIELD_PREP(SDC_CFG_DTOC, 3));
 
 	host->def_tune_para.iocon = readl(&host->base->msdc_iocon);
-	host->def_tune_para.pad_tune = readl(&host->base->pad_tune);
+	host->def_tune_para.pad_tune = readl(host->dev_comp->mt6797_timing ?
+		       &host->base->pad_tune0 : &host->base->pad_tune);
 }
 
 static void msdc_ungate_clock(struct msdc_host *host)
@@ -1876,6 +1901,15 @@ static const struct dm_mmc_ops msdc_ops = {
 	.wait_dat0 = msdc_ops_wait_dat0,
 };
 
+static const struct msdc_compatible mt6797_compat = {
+	.clk_div_bits = 12,
+	.pad_tune0 = true,
+	.async_fifo = true,
+	.async_fifo_crcsts = true,
+	.data_tune = true,
+	.mt6797_timing = true,
+};
+
 static const struct msdc_compatible mt7620_compat = {
 	.clk_div_bits = 8,
 	.pad_tune0 = false,
@@ -1992,6 +2026,7 @@ static const struct msdc_compatible mt8189_compat = {
 };
 
 static const struct udevice_id msdc_ids[] = {
+	{ .compatible = "mediatek,mt6797-mmc", .data = (ulong)&mt6797_compat },
 	{ .compatible = "mediatek,mt7620-mmc", .data = (ulong)&mt7620_compat },
 	{ .compatible = "mediatek,mt7621-mmc", .data = (ulong)&mt7621_compat },
 	{ .compatible = "mediatek,mt7622-mmc", .data = (ulong)&mt7622_compat },

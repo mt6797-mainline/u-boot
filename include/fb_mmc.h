@@ -9,6 +9,13 @@
 struct blk_desc;
 struct disk_partition;
 
+/* Board-owned logical partitions, e.g. a kernel slot behind a relay prefix. */
+int board_fastboot_mmc_part(const char *name, struct blk_desc **desc,
+			    struct disk_partition *part);
+int board_fastboot_mmc_write(const char *name, void *buffer, u32 bytes,
+			     char *response);
+int board_fastboot_mmc_erase(const char *name, char *response);
+
 /**
  * fastboot_mmc_get_part_info() - Lookup eMMC partion by name
  *

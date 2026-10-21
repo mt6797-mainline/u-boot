@@ -8,4 +8,5 @@ int x620_get_framebuffer(ulong *base, u32 *size);
 int x620_display_sync(void);
 void x620_fastboot_prepare(void);
 bool x620_fastboot_run(void);
+bool mt6797_wait_boot_key(void);
 #endif

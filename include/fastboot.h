@@ -14,6 +14,8 @@
 
 #include <linux/types.h>
 
+void fastboot_reboot(void);
+
 #define FASTBOOT_VERSION	"0.4"
 
 /*
